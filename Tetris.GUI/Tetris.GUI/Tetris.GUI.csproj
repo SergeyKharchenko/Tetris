@@ -68,6 +68,7 @@
     <Compile Include="FigurePosition.cs" />
     <Compile Include="FigureRegistry.cs" />
     <Compile Include="GameEngine.cs" />
+    <Compile Include="GameState.cs" />
     <Compile Include="MainForm.cs">
       <SubType>Form</SubType>
     </Compile>

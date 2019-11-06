@@ -34,11 +34,15 @@
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
+            this.BackColor = System.Drawing.Color.Black;
             this.ClientSize = new System.Drawing.Size(800, 450);
+            this.DoubleBuffered = true;
             this.Name = "MainForm";
-            this.Text = "Form1";
+            this.Text = "Tetris";
             this.FormClosed += new System.Windows.Forms.FormClosedEventHandler(this.OnFormClosed);
             this.Shown += new System.EventHandler(this.OnFormShown);
+            this.Paint += new System.Windows.Forms.PaintEventHandler(this.OnFormPaint);
+            this.Resize += new System.EventHandler(this.OnFormResize);
             this.ResumeLayout(false);
 
         }

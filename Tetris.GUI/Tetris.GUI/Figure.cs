@@ -19,7 +19,7 @@ namespace Tetris.GUI
             Position = position;
         }
 
-        public Point[] GetOffset()
+        public Point[] GetLocationWithOffset()
         {
             return Position.GetOffset(Location);
         }
@@ -37,12 +37,14 @@ namespace Tetris.GUI
             }
         }
 
-        public async Task MoveAsync(Point delta)
+        public async Task MoveAsync(Point offset)
         {
             await Mutex.WaitAsync();
             try
             {
-                Location.Offset(delta);
+                Point location = Location;
+                location.Offset(offset);
+                Location = location;
             }
             finally
             {

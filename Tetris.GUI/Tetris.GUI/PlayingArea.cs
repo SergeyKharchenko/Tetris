@@ -1,13 +1,17 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Reactive.Linq;
 using System.Reactive.Subjects;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Tetris.GUI
 {
     public class PlayingArea
     {
+        private readonly SemaphoreSlim Mutex = new SemaphoreSlim(1);
+
         private bool[,] Area;
         private readonly IMovingValidator MovingValidator;
 
@@ -16,7 +20,8 @@ namespace Tetris.GUI
 
         private Figure CurrentFigure;
 
-        public BehaviorSubject<FigureLifecycle> FigureLifecycle { get; private set; }
+        public IObservable<FigureLifecycle> FigureLifecycle => FigureLifecycleSubject?.AsObservable();
+        private BehaviorSubject<FigureLifecycle> FigureLifecycleSubject;
 
         public PlayingArea(IMovingValidator movingValidator)
         {
@@ -26,24 +31,64 @@ namespace Tetris.GUI
         public Task RestartAsync(int width, int height)
         {
             Area = new bool[width, height];
-            FigureLifecycle = new BehaviorSubject<FigureLifecycle>(new FigureLifecycle
+            FigureLifecycleSubject = new BehaviorSubject<FigureLifecycle>(new FigureLifecycle
             {
                 FigureLifecycleTypes = FigureLifecycleTypes.Init
             });
             return Task.CompletedTask;
         }
 
-        public void SetCurrentFigure(Figure figure)
+        public async Task SetCurrentFigureAsync(Figure figure)
         {
             CurrentFigure = figure;
+            await ProjectFigureAsync();
         }
 
-        public async Task MoveFigureAsync(Point delta)
+        private async Task ProjectFigureAsync()
         {
-            if (await MovingValidator.ValidateAsync(Area, CurrentFigure, delta))
+            await Mutex.WaitAsync();
+            try
             {
-                await CurrentFigure.MoveAsync(delta);
+                Point[] offset = CurrentFigure.GetLocationWithOffset();
+                foreach (Point point in offset)
+                {
+                    Area[point.X, point.Y] = true;
+                }
             }
+            finally
+            {
+                Mutex.Release();
+            }
+        }
+
+        public async Task MoveFigureAsync(Point offset)
+        {
+            if (await MovingValidator.ValidateAsync(Area, CurrentFigure, offset))
+            {
+                await CurrentFigure.MoveAsync(offset);
+                await ProjectFigureAsync();
+            }
+        }
+
+        public async Task<GameCell[,]> GetGameCellsAsync()
+        {
+            int width = Width;
+            int height = Height;
+            var cells = new GameCell[Width, Height];
+
+            for (var x = 0; x < width; ++x)
+            {
+                for (var y = 0; y < height; ++y) {
+                    bool value = Area[x, y];
+
+                    cells[x, y] = new GameCell
+                    {
+                        Location = new Point(x, y),
+                        Color = value ? Color.DeepSkyBlue : Color.Beige
+                    };
+                }
+            }
+            return await Task.FromResult(cells);
         }
     }
 }

@@ -1,32 +1,26 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.ComponentModel;
-using System.Data;
 using System.Drawing;
-using System.Linq;
-using System.Reactive.Concurrency;
+using System.Reactive;
 using System.Reactive.Linq;
-using System.Reactive.Subjects;
-using System.Security.Cryptography.X509Certificates;
-using System.Text;
 using System.Threading;
-using System.Threading.Tasks;
 using System.Windows.Forms;
 
 namespace Tetris.GUI
 {
     public partial class MainForm : Form
     {
-        private readonly Subject<int> Subject;
-        private readonly Subject<IObservable<long>> Timer;
-        private TimeSpan Interval = TimeSpan.FromSeconds(1);
-        private readonly GameEngine GameEngine = new GameEngine();
+        private readonly GameEngine GameEngine;
+        private IDisposable GameStateSubscription;
+        private GameState CurrentGameState;
+
+        private float CellWidth  = -1;
+        private float CellHeight  = -1;
 
         public MainForm()
         {
             InitializeComponent();
 
-
+            GameEngine = new GameEngine(CreateKeyboardListeningObservable());
             //Subject = new Subject<int>();
 
             //Console.WriteLine($"UI: {Thread.CurrentThread.ManagedThreadId}");
@@ -56,18 +50,85 @@ namespace Tetris.GUI
             //                                    },
             //                                    () => subscription?.Dispose());
 
-
-
         }
 
         private async void OnFormShown(object sender, EventArgs e)
         {
             await GameEngine.StartAsync();
+            GameStateSubscription = GameEngine.GameState.ObserveOn(SynchronizationContext.Current).Subscribe(
+                gameState =>
+                {
+                    CurrentGameState = gameState;
+                    Invalidate();
+                });
+        }
+
+        private void OnFormPaint(object sender, PaintEventArgs e)
+        {
+            if (CurrentGameState == null)
+            {
+                return;
+            }
+            if (Math.Abs(CellWidth - -1) < float.Epsilon || Math.Abs(CellHeight - -1) < float.Epsilon)
+            {
+                CalculateCellSettings();
+            }
+
+            foreach (GameCell cell in CurrentGameState.Cells)
+            {
+                using (var brush = new SolidBrush(cell.Color))
+                {
+                    e.Graphics.FillRectangle(brush,
+                                             cell.Location.X * CellWidth,
+                                             cell.Location.Y * CellHeight,
+                                             CellWidth,
+                                             CellHeight);
+                }
+                using (var pen = new Pen(Color.Black))
+                {
+                    e.Graphics.DrawRectangle(pen,
+                                             cell.Location.X * CellWidth,
+                                             cell.Location.Y * CellHeight,
+                                             CellWidth,
+                                             CellHeight);
+                }
+            }
         }
 
         private void OnFormClosed(object sender, FormClosedEventArgs e)
         {
+            GameStateSubscription.Dispose();
             GameEngine.Dispose();
+        }
+
+        private void OnFormResize(object sender, EventArgs e)
+        {
+            CalculateCellSettings();
+            Invalidate();
+        }
+
+        private void CalculateCellSettings()
+        {
+            if (CurrentGameState == null)
+            {
+                return;
+            }
+            int cellWidth = CurrentGameState.Cells.GetUpperBound(0);
+            int cellHeight = CurrentGameState.Cells.GetUpperBound(0);
+
+            CellWidth = ClientSize.Width / (float) cellWidth;
+            CellHeight = ClientSize.Height / (float) cellHeight;
+        }
+
+        private IObservable<Point> CreateKeyboardListeningObservable()
+        {
+            return Observable.FromEventPattern<KeyEventHandler, KeyEventArgs>(
+                                 handler => (s, args) => handler(s, args),
+                                 handler => KeyDown += handler,
+                                 handler => KeyDown -= handler)
+                             .Where(pattern => pattern.EventArgs.KeyCode == Keys.Left ||
+                                               pattern.EventArgs.KeyCode == Keys.Right)
+                             .Select(pattern => new Point(pattern.EventArgs.KeyCode == Keys.Left ? -1 : 1, 0));
         }
     }
 }
