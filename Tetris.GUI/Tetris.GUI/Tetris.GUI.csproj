@@ -78,6 +78,7 @@
   <ItemGroup>
     <Compile Include="Constants.cs" />
     <Compile Include="Figure.cs" />
+    <Compile Include="FigureCreator.cs" />
     <Compile Include="FigureLifecycle.cs" />
     <Compile Include="FigurePosition.cs" />
     <Compile Include="GameEngine.cs" />
@@ -90,6 +91,8 @@
     </Compile>
     <Compile Include="IFigureCreator.cs" />
     <Compile Include="IMovingValidator.cs" />
+    <Compile Include="MovingFigureResult.cs" />
+    <Compile Include="MovingValidationResult.cs" />
     <Compile Include="MovingValidator.cs" />
     <Compile Include="PlayingArea.cs" />
     <Compile Include="Program.cs" />

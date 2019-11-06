@@ -113,8 +113,8 @@ namespace Tetris.GUI
             {
                 return;
             }
-            int cellWidth = CurrentGameState.Cells.GetUpperBound(0);
-            int cellHeight = CurrentGameState.Cells.GetUpperBound(0);
+            int cellWidth = CurrentGameState.Cells.GetUpperBound(0) + 1;
+            int cellHeight = CurrentGameState.Cells.GetUpperBound(1) + 1;
 
             CellWidth = ClientSize.Width / (float) cellWidth;
             CellHeight = ClientSize.Height / (float) cellHeight;

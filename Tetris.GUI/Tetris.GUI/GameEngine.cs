@@ -46,12 +46,12 @@ namespace Tetris.GUI
 
             IDisposable keyboardListeningSubscription =
                 KeyboardListeningObservable.ObserveOn(Scheduler.Default)
-                                           .Subscribe(async offset => { await MoveFigureAsync(offset); });
+                                           .Subscribe(async offset => { await PlayingArea.MoveFigureAsync(offset); });
             Subscriptions.Add(keyboardListeningSubscription);
 
             IDisposable intervalSubscription =
                 Observable.Interval(Constants.Speed).ObserveOn(Scheduler.Default)
-                          .Subscribe(async _ => await MoveFigureAsync(new Point(0, 1)));
+                          .Subscribe(async _ => await PlayingArea.MoveFigureAsync(new Point(0, 1)));
             Subscriptions.Add(intervalSubscription);
         }
 
@@ -60,19 +60,19 @@ namespace Tetris.GUI
             switch (figureLifecycle.FigureLifecycleTypes)
             {
                 case FigureLifecycleTypes.Init:
+                case FigureLifecycleTypes.Dead:
                 {
                     Figure figure = await FigureCreator.CreateFigureAsync(Constants.GameAreaWidth);
                     await PlayingArea.SetCurrentFigureAsync(figure);
+                    GameStateSubject.OnNext(await BuildGameState());
+                    break;
+                }
+                case FigureLifecycleTypes.Moved:
+                {
+                    GameStateSubject.OnNext(await BuildGameState());
                     break;
                 }
             }
-            GameStateSubject.OnNext(await BuildGameState());
-        }
-
-        private async Task MoveFigureAsync(Point offset)
-        {
-            await PlayingArea.MoveFigureAsync(offset);
-            GameStateSubject.OnNext(await BuildGameState());
         }
 
         private async Task<GameState> BuildGameState()

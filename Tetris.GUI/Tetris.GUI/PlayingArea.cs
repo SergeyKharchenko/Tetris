@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Drawing;
+using System.Linq;
 using System.Reactive.Linq;
 using System.Reactive.Subjects;
 using System.Threading;
@@ -38,7 +39,10 @@ namespace Tetris.GUI
                 Area = new GameCell[width, height];
                 for (var x = 0; x < Width; ++x) {
                     for (var y = 0; y < Height; ++y) {
-                        Area[x, y] = new GameCell();
+                        Area[x, y] = new GameCell
+                        {
+                            Location = new Point(x, y)
+                        };
                     }
                 }
             
@@ -69,12 +73,12 @@ namespace Tetris.GUI
 
         private Task ProjectFigureAsync()
         {
-            foreach (GameCell cell in Area)
+            foreach (GameCell cell in Area.Cast<GameCell>().Where(cell => cell.IsOccupied))
             {
                 cell.IsFigure = false;
             }
 
-            Point[] offset = CurrentFigure.GetLocationWithOffset();
+            Point[] offset = CurrentFigure.GetPositionWithOffset();
             foreach (Point point in offset)
             {
                 Area[point.X, point.Y].IsFigure = true;
@@ -85,19 +89,49 @@ namespace Tetris.GUI
 
         public async Task MoveFigureAsync(Point offset)
         {
+            if (CurrentFigure == null)
+            {
+                return;
+            }
+
+            var lifecycleType = FigureLifecycleTypes.None;
+
             await Mutex.WaitAsync();
             try
             {
-                if (await MovingValidator.ValidateAsync(Area, CurrentFigure, offset))
+                MovingValidationResult result = await MovingValidator.ValidateAsync(Area, CurrentFigure, offset);
+                if (result.Allow)
                 {
                     await CurrentFigure.MoveAsync(offset);
                     await ProjectFigureAsync();
+                    lifecycleType = FigureLifecycleTypes.Moved;
+                } else if (result.Dead)
+                {
+                    await KillCurrentFigureAsync();
+                    lifecycleType = FigureLifecycleTypes.Dead;
+
                 }
             }
             finally
             {
                 Mutex.Release();
             }
+            FigureLifecycleSubject.OnNext(new FigureLifecycle
+            {
+                FigureLifecycleTypes = lifecycleType
+            });
+        }
+
+        private Task KillCurrentFigureAsync()
+        {
+            foreach (GameCell cell in Area.Cast<GameCell>().Where(cell => cell.IsOccupied))
+            {
+                cell.IsFigure = false;
+                cell.IsOccupied = true;
+            }
+
+            CurrentFigure = null;
+            return Task.CompletedTask;
         }
 
         public async Task<GameCell[,]> GetGameCellsAsync()

@@ -8,8 +8,9 @@
 
     public enum FigureLifecycleTypes
     {
-        Init = 0,
-        Moved = 1,
-        Dead = 2
+        None = 0,
+        Init = 1,
+        Moved = 2,
+        Dead = 3
     }
 }

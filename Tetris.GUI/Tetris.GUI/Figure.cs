@@ -1,23 +1,25 @@
 ﻿using System;
 using System.Drawing;
-using System.Threading;
 using System.Threading.Tasks;
 
 namespace Tetris.GUI
 {
     public class Figure
     {
-        public Point Location { get; set; }
+        public Point Location { get; private set; }
 
-        public FigurePosition Position { get; set; }
+        public FigurePosition Position { get; private set; }
 
-        public Figure(Point location, FigurePosition position)
+        public Color Color { get; private set; }
+
+        public Figure(Point location, FigurePosition position, Color color)
         {
             Location = location;
             Position = position;
+            Color = color;
         }
 
-        public Point[] GetLocationWithOffset()
+        public Point[] GetPositionWithOffset()
         {
             return Position.GetOffset(Location);
         }
