@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Drawing;
 using System.Linq;
 
 namespace Tetris.GUI
@@ -86,17 +87,5 @@ namespace Tetris.GUI
             return sidePoints;
         }
 
-    }
-
-    public struct Point
-    {
-        public int X { get; set; }
-        public int Y { get; set; }
-
-        public Point(int x, int y)
-        {
-            X = x;
-            Y = y;
-        }
     }
 }

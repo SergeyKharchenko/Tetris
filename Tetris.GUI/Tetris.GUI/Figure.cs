@@ -7,8 +7,6 @@ namespace Tetris.GUI
 {
     public class Figure
     {
-        private readonly SemaphoreSlim Mutex = new SemaphoreSlim(1);
-
         public Point Location { get; set; }
 
         public FigurePosition Position { get; set; }
@@ -26,30 +24,15 @@ namespace Tetris.GUI
 
         public async Task RotateAsync()
         {
-            await Mutex.WaitAsync();
-            try
-            {
-                Position = await Position.RotateAsync();
-            }
-            finally
-            {
-                Mutex.Release();
-            }
+            Position = await Position.RotateAsync();
         }
 
-        public async Task MoveAsync(Point offset)
+        public Task MoveAsync(Point offset)
         {
-            await Mutex.WaitAsync();
-            try
-            {
-                Point location = Location;
-                location.Offset(offset);
-                Location = location;
-            }
-            finally
-            {
-                Mutex.Release();
-            }
+            Point location = Location;
+            location.Offset(offset);
+            Location = location;
+            return Task.CompletedTask;
         }
 
         public override string ToString()

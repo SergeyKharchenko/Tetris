@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Drawing;
 using System.Reactive.Linq;
 using System.Reactive.Subjects;
@@ -12,11 +13,11 @@ namespace Tetris.GUI
     {
         private readonly SemaphoreSlim Mutex = new SemaphoreSlim(1);
 
-        private bool[,] Area;
+        private GameCell[,] Area;
         private readonly IMovingValidator MovingValidator;
 
-        public int Width => Area.GetUpperBound(0);
-        public int Height => Area.GetUpperBound(1);
+        public int Width => Area.GetUpperBound(0) + 1;
+        public int Height => Area.GetUpperBound(1) + 1;
 
         private Figure CurrentFigure;
 
@@ -28,32 +29,23 @@ namespace Tetris.GUI
             MovingValidator = movingValidator;
         }
 
-        public Task RestartAsync(int width, int height)
-        {
-            Area = new bool[width, height];
-            FigureLifecycleSubject = new BehaviorSubject<FigureLifecycle>(new FigureLifecycle
-            {
-                FigureLifecycleTypes = FigureLifecycleTypes.Init
-            });
-            return Task.CompletedTask;
-        }
-
-        public async Task SetCurrentFigureAsync(Figure figure)
-        {
-            CurrentFigure = figure;
-            await ProjectFigureAsync();
-        }
-
-        private async Task ProjectFigureAsync()
+        public async Task RestartAsync(int width, int height)
         {
             await Mutex.WaitAsync();
+
             try
             {
-                Point[] offset = CurrentFigure.GetLocationWithOffset();
-                foreach (Point point in offset)
-                {
-                    Area[point.X, point.Y] = true;
+                Area = new GameCell[width, height];
+                for (var x = 0; x < Width; ++x) {
+                    for (var y = 0; y < Height; ++y) {
+                        Area[x, y] = new GameCell();
+                    }
                 }
+            
+                FigureLifecycleSubject = new BehaviorSubject<FigureLifecycle>(new FigureLifecycle
+                {
+                    FigureLifecycleTypes = FigureLifecycleTypes.Init
+                });
             }
             finally
             {
@@ -61,12 +53,50 @@ namespace Tetris.GUI
             }
         }
 
+        public async Task SetCurrentFigureAsync(Figure figure)
+        {
+            await Mutex.WaitAsync();
+            try
+            {
+                CurrentFigure = figure;
+                await ProjectFigureAsync();
+            }
+            finally
+            {
+                Mutex.Release();
+            }
+        }
+
+        private Task ProjectFigureAsync()
+        {
+            foreach (GameCell cell in Area)
+            {
+                cell.IsFigure = false;
+            }
+
+            Point[] offset = CurrentFigure.GetLocationWithOffset();
+            foreach (Point point in offset)
+            {
+                Area[point.X, point.Y].IsFigure = true;
+            }
+
+            return Task.CompletedTask;
+        }
+
         public async Task MoveFigureAsync(Point offset)
         {
-            if (await MovingValidator.ValidateAsync(Area, CurrentFigure, offset))
+            await Mutex.WaitAsync();
+            try
             {
-                await CurrentFigure.MoveAsync(offset);
-                await ProjectFigureAsync();
+                if (await MovingValidator.ValidateAsync(Area, CurrentFigure, offset))
+                {
+                    await CurrentFigure.MoveAsync(offset);
+                    await ProjectFigureAsync();
+                }
+            }
+            finally
+            {
+                Mutex.Release();
             }
         }
 
@@ -79,12 +109,16 @@ namespace Tetris.GUI
             for (var x = 0; x < width; ++x)
             {
                 for (var y = 0; y < height; ++y) {
-                    bool value = Area[x, y];
+                    GameCell cell = Area[x, y];
 
                     cells[x, y] = new GameCell
                     {
                         Location = new Point(x, y),
-                        Color = value ? Color.DeepSkyBlue : Color.Beige
+                        Color = cell.IsFigure
+                            ? Color.DeepSkyBlue
+                            : cell.IsOccupied
+                                ? Color.Red
+                                : Constants.BackgroundColor
                     };
                 }
             }

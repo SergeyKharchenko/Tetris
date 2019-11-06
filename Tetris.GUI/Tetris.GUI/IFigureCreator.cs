@@ -7,32 +7,29 @@ namespace Tetris.GUI
 {
     public interface IFigureCreator
     {
-        Task<Figure> CreateFigureAsync(Point initialLocation);
+        Task<Figure> CreateFigureAsync(int width);
     }
 
-    public class RegistryFigureCreator : IFigureCreator
+    public class FigureCreator : IFigureCreator
     {
+        private readonly TetrominoGenerator Generator = new TetrominoGenerator();
         private readonly Random Random;
 
-        public RegistryFigureCreator()
+        public FigureCreator()
         {
             Random = new Random((int) DateTime.Now.Ticks);
         }
 
-        public Task<Figure> CreateFigureAsync(Point initialLocation)
+        public Task<Figure> CreateFigureAsync(int width)
         {
-            int index = Random.Next(0, FigureRegistry.Registry.Length - 1);
-            int[,] shape = FigureRegistry.Registry[index];
-            int size = shape.GetUpperBound(0) + 1;
-            bool[,] shape2 = new bool[size, size];
+            int figureSize = Random.Next(1, Constants.FigureMaxWidth);
+            bool[,] shape = Generator.CreateTetromino(figureSize,
+                                                      Random.Next(
+                                                          1,
+                                                          Math.Min(figureSize * 2,
+                                                                   figureSize * figureSize)));
 
-            for (var i = 0; i < size; ++i) {
-                for (var j = 0; j < size; ++j) {
-                    shape2[i, j] = Convert.ToBoolean(shape[i, j]);
-                }
-            }
-
-            return Task.FromResult(new Figure(initialLocation, new FigurePosition(shape2)));
+            return Task.FromResult(new Figure(new Point(width / 2 - figureSize / 2, 0), new FigurePosition(shape)));
         }
     }
 }
