@@ -73,15 +73,17 @@ namespace Tetris.GUI
 
         private Task ProjectFigureAsync()
         {
-            foreach (GameCell cell in Area.Cast<GameCell>().Where(cell => cell.IsOccupied))
+            foreach (GameCell cell in Area.Cast<GameCell>().Where(cell => cell.IsFigure))
             {
                 cell.IsFigure = false;
+                cell.Color = Constants.BackgroundColor;
             }
 
             Point[] offset = CurrentFigure.GetPositionWithOffset();
             foreach (Point point in offset)
             {
                 Area[point.X, point.Y].IsFigure = true;
+                Area[point.X, point.Y].Color = CurrentFigure.Color;
             }
 
             return Task.CompletedTask;
@@ -143,17 +145,7 @@ namespace Tetris.GUI
             for (var x = 0; x < width; ++x)
             {
                 for (var y = 0; y < height; ++y) {
-                    GameCell cell = Area[x, y];
-
-                    cells[x, y] = new GameCell
-                    {
-                        Location = new Point(x, y),
-                        Color = cell.IsFigure
-                            ? CurrentFigure.Color
-                            : cell.IsOccupied
-                                ? Color.Red
-                                : Constants.BackgroundColor
-                    };
+                    cells[x, y] = (GameCell) Area[x, y].Clone();
                 }
             }
             return await Task.FromResult(cells);
