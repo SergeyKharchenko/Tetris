@@ -75,7 +75,7 @@ namespace Tetris.GUI
                 CalculateCellSettings();
             }
 
-            foreach (GameCell cell in CurrentGameState.Cells)
+            foreach (GameCell cell in CurrentGameState.Area)
             {
                 using (var brush = new SolidBrush(cell.Color))
                 {
@@ -116,11 +116,8 @@ namespace Tetris.GUI
                 return;
             }
 
-            int cellWidth = CurrentGameState.Cells.GetUpperBound(0) + 1;
-            int cellHeight = CurrentGameState.Cells.GetUpperBound(1) + 1;
-
-            CellWidth = ClientSize.Width / (float)cellWidth;
-            CellHeight = ClientSize.Height / (float)cellHeight;
+            CellWidth = ClientSize.Width / (float)CurrentGameState.Area.Width;
+            CellHeight = ClientSize.Height / (float)CurrentGameState.Area.Height;
         }
 
         private IObservable<Point> CreateNavigationObservable()

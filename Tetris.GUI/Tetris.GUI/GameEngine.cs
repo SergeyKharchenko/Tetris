@@ -6,12 +6,10 @@ using System.Reactive.Linq;
 using System.Reactive.Subjects;
 using System.Threading.Tasks;
 
-namespace Tetris.GUI
-{
-    public class GameEngine : IDisposable
-    {
+namespace Tetris.GUI {
+    public class GameEngine : IDisposable {
         private readonly IFigureCreator FigureCreator = new FigureCreator();
-        private readonly PlayingArea PlayingArea = new PlayingArea(new MovingValidator());
+        private readonly GameArea PlayingArea = new GameArea(new MovingValidator());
         private readonly List<IDisposable> Subscriptions = new List<IDisposable>();
         private readonly IObservable<Point> _navigationObservable;
         private readonly IObservable<bool> _rotationObservable;
@@ -19,25 +17,21 @@ namespace Tetris.GUI
         public IObservable<GameState> GameState => GameStateSubject?.AsObservable();
         private BehaviorSubject<GameState> GameStateSubject;
 
-        public GameEngine(IObservable<Point> navigationObservable, IObservable<bool> rotationObservable)
-        {
+        public GameEngine(IObservable<Point> navigationObservable, IObservable<bool> rotationObservable) {
             _navigationObservable = navigationObservable;
             _rotationObservable = rotationObservable;
         }
 
-        public void Dispose()
-        {
+        public void Dispose() {
             Unsubscribe();
         }
 
-        private void Unsubscribe()
-        {
+        private void Unsubscribe() {
             Subscriptions.ForEach(subscription => subscription.Dispose());
             Subscriptions.Clear();
         }
 
-        public async Task StartAsync()
-        {
+        public async Task StartAsync() {
             Unsubscribe();
 
             await PlayingArea.RestartAsync(Constants.GameAreaWidth, Constants.GameAreaHeight);
@@ -62,32 +56,26 @@ namespace Tetris.GUI
             Subscriptions.Add(intervalSubscription);
         }
 
-        private async void OnNextFigureLifecycle(FigureLifecycle figureLifecycle)
-        {
-            switch (figureLifecycle.FigureLifecycleTypes)
-            {
+        private async void OnNextFigureLifecycle(FigureLifecycle figureLifecycle) {
+            switch (figureLifecycle.FigureLifecycleTypes) {
                 case FigureLifecycleTypes.Init:
-                case FigureLifecycleTypes.Dead:
-                    {
-                        Figure figure = await FigureCreator.CreateFigureAsync(Constants.GameAreaWidth);
-                        await PlayingArea.SetCurrentFigureAsync(figure);
-                        GameStateSubject.OnNext(await BuildGameState());
-                        break;
-                    }
+                case FigureLifecycleTypes.Dead: {
+                    Figure figure = await FigureCreator.CreateFigureAsync(Constants.GameAreaWidth);
+                    await PlayingArea.SetCurrentFigureAsync(figure);
+                    GameStateSubject.OnNext(await BuildGameState());
+                    break;
+                }   
                 case FigureLifecycleTypes.Rotated:
-                case FigureLifecycleTypes.Moved:
-                    {
-                        GameStateSubject.OnNext(await BuildGameState());
-                        break;
-                    }
+                case FigureLifecycleTypes.Moved: {
+                    GameStateSubject.OnNext(await BuildGameState());
+                    break;
+                }
             }
         }
 
-        private async Task<GameState> BuildGameState()
-        {
-            return new GameState
-            {
-                Cells = await PlayingArea.GetGameCellsAsync()
+        private async Task<GameState> BuildGameState() {
+            return new GameState {
+                Area = await PlayingArea.GetGameCellsAsync()
             };
         }
     }

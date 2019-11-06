@@ -35,7 +35,7 @@ namespace Tetris.GUI
 
             bool[,] shape = Generator.CreateTetromino(blocksAmount);
 
-            var location = new Point(width / 2 - figureSize / 2, 0);
+            var location = new Point(width / 2 - shape.GetUpperBound(0) / 2, 0);
             Color color = Colors[Random.Next(0, Colors.Length)];
             return Task.FromResult(new Figure(location, new FigurePosition(shape), color));
         }

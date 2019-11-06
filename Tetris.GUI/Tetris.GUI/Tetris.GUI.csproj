@@ -82,6 +82,7 @@
     <Compile Include="FigureLifecycle.cs" />
     <Compile Include="FigurePosition.cs" />
     <Compile Include="GameEngine.cs" />
+    <Compile Include="GameGrid.cs" />
     <Compile Include="GameState.cs" />
     <Compile Include="MainForm.cs">
       <SubType>Form</SubType>
@@ -93,7 +94,7 @@
     <Compile Include="IMovingValidator.cs" />
     <Compile Include="MovingValidationResult.cs" />
     <Compile Include="MovingValidator.cs" />
-    <Compile Include="PlayingArea.cs" />
+    <Compile Include="GameArea.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Tetromino\TetraminoProjector.cs" />
