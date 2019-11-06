@@ -65,8 +65,9 @@ namespace Tetris.GUI
             {
                 int rightBorder = cells
                                    .Where(cell => cell.Location.Y == leftPoint.Y && cell.IsOccupied)
-                                   .Where(cell => cell.Location.X > leftPoint.X).Select(cell => cell.Location.X)
+                                   .Where(cell => cell.Location.X < leftPoint.X).Select(cell => cell.Location.X)
                                        .DefaultIfEmpty(-1).Max();
+
                 if (rightBorder == leftPoint.X - 1)
                 {
                     return Task.FromResult(new MovingValidationResult

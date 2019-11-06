@@ -54,7 +54,7 @@ namespace Tetris.GUI
                           .Subscribe(async _ => await PlayingArea.MoveFigureAsync(new Point(0, 1)));
             Subscriptions.Add(intervalSubscription);
         }
-
+        
         private async void OnNextFigureLifecycle(FigureLifecycle figureLifecycle)
         {
             switch (figureLifecycle.FigureLifecycleTypes)
