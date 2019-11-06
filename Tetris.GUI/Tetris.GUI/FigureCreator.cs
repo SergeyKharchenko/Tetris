@@ -8,8 +8,17 @@ namespace Tetris.GUI {
         private readonly TetrominoGenerator Generator = new TetrominoGenerator();
         private readonly Random Random;
 
-        private static Color[] Colors = {
-            Color.Yellow
+        private static readonly Color[] Colors = {
+            Color.Yellow,
+            Color.Aqua,
+            Color.Coral,
+            Color.Aquamarine,
+            Color.LawnGreen,
+            Color.DarkOrchid,
+            Color.LightPink,
+            Color.RoyalBlue,
+            Color.Magenta,
+            Color.Wheat
         };
 
         public FigureCreator()
@@ -26,7 +35,9 @@ namespace Tetris.GUI {
                                                           Math.Min(figureSize * 2,
                                                                    figureSize * figureSize)));
 
-            return Task.FromResult(new Figure(new Point(width / 2 - figureSize / 2, 0), new FigurePosition(shape)));
+            var location = new Point(width / 2 - figureSize / 2, 0);
+            Color color = Colors[Random.Next(0, Colors.Length)];
+            return Task.FromResult(new Figure(location, new FigurePosition(shape), color));
         }
     }
 }

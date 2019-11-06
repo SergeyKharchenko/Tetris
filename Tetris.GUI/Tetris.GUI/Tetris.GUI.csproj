@@ -91,7 +91,6 @@
     </Compile>
     <Compile Include="IFigureCreator.cs" />
     <Compile Include="IMovingValidator.cs" />
-    <Compile Include="MovingFigureResult.cs" />
     <Compile Include="MovingValidationResult.cs" />
     <Compile Include="MovingValidator.cs" />
     <Compile Include="PlayingArea.cs" />

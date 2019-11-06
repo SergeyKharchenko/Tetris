@@ -149,7 +149,7 @@ namespace Tetris.GUI
                     {
                         Location = new Point(x, y),
                         Color = cell.IsFigure
-                            ? Color.DeepSkyBlue
+                            ? CurrentFigure.Color
                             : cell.IsOccupied
                                 ? Color.Red
                                 : Constants.BackgroundColor
