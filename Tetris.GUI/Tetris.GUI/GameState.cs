@@ -1,4 +1,5 @@
-﻿using System.Drawing;
+﻿using System;
+using System.Drawing;
 
 namespace Tetris.GUI {
     public class GameState
@@ -6,7 +7,7 @@ namespace Tetris.GUI {
         public GameCell[,] Cells;
     }
 
-    public class GameCell
+    public class GameCell : ICloneable
     {
         public Point Location { get; set; }
 
@@ -21,5 +22,12 @@ namespace Tetris.GUI {
         }
         private bool IsOccupiedBacking;
 
+        public object Clone()
+        {
+            return new GameCell
+            {
+                Location = Location, Color = Color, IsFigure = IsFigure, IsOccupied = IsOccupiedBacking
+            };
+        }
     }
 }
