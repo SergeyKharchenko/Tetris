@@ -23,7 +23,7 @@ namespace Tetris.GUI
         {
             return Position.GetOffset(Location);
         }
-        
+
         public async Task RotateAsync()
         {
             await Mutex.WaitAsync();
