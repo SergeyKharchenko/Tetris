@@ -13,14 +13,14 @@ namespace Tetris.GUI
         private IDisposable GameStateSubscription;
         private GameState CurrentGameState;
 
-        private float CellWidth  = -1;
-        private float CellHeight  = -1;
+        private float CellWidth = -1;
+        private float CellHeight = -1;
 
         public MainForm()
         {
             InitializeComponent();
 
-            GameEngine = new GameEngine(CreateKeyboardListeningObservable());
+            GameEngine = new GameEngine(CreateNavigationObservable(), CreateRotationObservable());
             //Subject = new Subject<int>();
 
             //Console.WriteLine($"UI: {Thread.CurrentThread.ManagedThreadId}");
@@ -69,6 +69,7 @@ namespace Tetris.GUI
             {
                 return;
             }
+
             if (Math.Abs(CellWidth - -1) < float.Epsilon || Math.Abs(CellHeight - -1) < float.Epsilon)
             {
                 CalculateCellSettings();
@@ -79,18 +80,19 @@ namespace Tetris.GUI
                 using (var brush = new SolidBrush(cell.Color))
                 {
                     e.Graphics.FillRectangle(brush,
-                                             cell.Location.X * CellWidth,
-                                             cell.Location.Y * CellHeight,
-                                             CellWidth,
-                                             CellHeight);
+                        cell.Location.X * CellWidth,
+                        cell.Location.Y * CellHeight,
+                        CellWidth,
+                        CellHeight);
                 }
+
                 using (var pen = new Pen(Color.Black))
                 {
                     e.Graphics.DrawRectangle(pen,
-                                             cell.Location.X * CellWidth,
-                                             cell.Location.Y * CellHeight,
-                                             CellWidth,
-                                             CellHeight);
+                        cell.Location.X * CellWidth,
+                        cell.Location.Y * CellHeight,
+                        CellWidth,
+                        CellHeight);
                 }
             }
         }
@@ -113,22 +115,33 @@ namespace Tetris.GUI
             {
                 return;
             }
+
             int cellWidth = CurrentGameState.Cells.GetUpperBound(0) + 1;
             int cellHeight = CurrentGameState.Cells.GetUpperBound(1) + 1;
 
-            CellWidth = ClientSize.Width / (float) cellWidth;
-            CellHeight = ClientSize.Height / (float) cellHeight;
+            CellWidth = ClientSize.Width / (float)cellWidth;
+            CellHeight = ClientSize.Height / (float)cellHeight;
         }
 
-        private IObservable<Point> CreateKeyboardListeningObservable()
+        private IObservable<Point> CreateNavigationObservable()
         {
             return Observable.FromEventPattern<KeyEventHandler, KeyEventArgs>(
-                                 handler => (s, args) => handler(s, args),
-                                 handler => KeyDown += handler,
-                                 handler => KeyDown -= handler)
-                             .Where(pattern => pattern.EventArgs.KeyCode == Keys.Left ||
-                                               pattern.EventArgs.KeyCode == Keys.Right)
-                             .Select(pattern => new Point(pattern.EventArgs.KeyCode == Keys.Left ? -1 : 1, 0));
+                    handler => (s, args) => handler(s, args),
+                    handler => KeyDown += handler,
+                    handler => KeyDown -= handler)
+                .Where(pattern => pattern.EventArgs.KeyCode == Keys.Left ||
+                                  pattern.EventArgs.KeyCode == Keys.Right)
+                .Select(pattern => new Point(pattern.EventArgs.KeyCode == Keys.Left ? -1 : 1, 0));
+        }
+
+        private IObservable<bool> CreateRotationObservable()
+        {
+            return Observable.FromEventPattern<KeyEventHandler, KeyEventArgs>(
+                    handler => (s, args) => handler(s, args),
+                    handler => KeyDown += handler,
+                    handler => KeyDown -= handler)
+                .Where(pattern => pattern.EventArgs.KeyCode == Keys.Space)
+                .Select(_ => true);
         }
     }
 }

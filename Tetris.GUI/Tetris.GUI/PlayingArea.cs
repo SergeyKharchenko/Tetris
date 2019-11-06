@@ -37,15 +37,17 @@ namespace Tetris.GUI
             try
             {
                 Area = new GameCell[width, height];
-                for (var x = 0; x < Width; ++x) {
-                    for (var y = 0; y < Height; ++y) {
+                for (var x = 0; x < Width; ++x)
+                {
+                    for (var y = 0; y < Height; ++y)
+                    {
                         Area[x, y] = new GameCell
                         {
                             Location = new Point(x, y)
                         };
                     }
                 }
-            
+
                 FigureLifecycleSubject = new BehaviorSubject<FigureLifecycle>(new FigureLifecycle
                 {
                     FigureLifecycleTypes = FigureLifecycleTypes.Init
@@ -107,12 +109,52 @@ namespace Tetris.GUI
                     await CurrentFigure.MoveAsync(offset);
                     await ProjectFigureAsync();
                     lifecycleType = FigureLifecycleTypes.Moved;
-                } else if (result.Dead)
+                }
+                else if (result.Dead)
                 {
                     await KillCurrentFigureAsync();
                     lifecycleType = FigureLifecycleTypes.Dead;
 
                 }
+            }
+            finally
+            {
+                Mutex.Release();
+            }
+            FigureLifecycleSubject.OnNext(new FigureLifecycle
+            {
+                FigureLifecycleTypes = lifecycleType
+            });
+        }
+
+        public async Task RotateFigureAsync()
+        {
+            if (CurrentFigure == null)
+            {
+                return;
+            }
+
+            var lifecycleType = FigureLifecycleTypes.None;
+
+            await Mutex.WaitAsync();
+            try
+            {
+                await CurrentFigure.RotateAsync();
+                await ProjectFigureAsync();
+                lifecycleType = FigureLifecycleTypes.Rotated;
+                //MovingValidationResult result = await MovingValidator.ValidateAsync(Area, CurrentFigure, offset);
+                //if (result.Allow)
+                //{
+                //    await CurrentFigure.MoveAsync(offset);
+                //    await ProjectFigureAsync();
+                //    lifecycleType = FigureLifecycleTypes.Moved;
+                //}
+                //else if (result.Dead)
+                //{
+                //    await KillCurrentFigureAsync();
+                //    lifecycleType = FigureLifecycleTypes.Dead;
+
+                //}
             }
             finally
             {
@@ -144,8 +186,9 @@ namespace Tetris.GUI
 
             for (var x = 0; x < width; ++x)
             {
-                for (var y = 0; y < height; ++y) {
-                    cells[x, y] = (GameCell) Area[x, y].Clone();
+                for (var y = 0; y < height; ++y)
+                {
+                    cells[x, y] = (GameCell)Area[x, y].Clone();
                 }
             }
             return await Task.FromResult(cells);

@@ -13,14 +13,16 @@ namespace Tetris.GUI
         private readonly IFigureCreator FigureCreator = new FigureCreator();
         private readonly PlayingArea PlayingArea = new PlayingArea(new MovingValidator());
         private readonly List<IDisposable> Subscriptions = new List<IDisposable>();
-        private readonly IObservable<Point> KeyboardListeningObservable;
+        private readonly IObservable<Point> _navigationObservable;
+        private readonly IObservable<bool> _rotationObservable;
 
         public IObservable<GameState> GameState => GameStateSubject?.AsObservable();
         private BehaviorSubject<GameState> GameStateSubject;
 
-        public GameEngine(IObservable<Point> keyboardListeningObservable)
+        public GameEngine(IObservable<Point> navigationObservable, IObservable<bool> rotationObservable)
         {
-            KeyboardListeningObservable = keyboardListeningObservable;
+            _navigationObservable = navigationObservable;
+            _rotationObservable = rotationObservable;
         }
 
         public void Dispose()
@@ -44,34 +46,40 @@ namespace Tetris.GUI
                 PlayingArea.FigureLifecycle.ObserveOn(Scheduler.Default).Subscribe(OnNextFigureLifecycle);
             Subscriptions.Add(figureLifecycleSubscribe);
 
-            IDisposable keyboardListeningSubscription =
-                KeyboardListeningObservable.ObserveOn(Scheduler.Default)
+            IDisposable navigationSubscription =
+                _navigationObservable.ObserveOn(Scheduler.Default)
                                            .Subscribe(async offset => { await PlayingArea.MoveFigureAsync(offset); });
-            Subscriptions.Add(keyboardListeningSubscription);
+            Subscriptions.Add(navigationSubscription);
+
+            IDisposable rotationSubscription =
+                _rotationObservable.ObserveOn(Scheduler.Default)
+                                           .Subscribe(async offset => { await PlayingArea.RotateFigureAsync(); });
+            Subscriptions.Add(rotationSubscription);
 
             IDisposable intervalSubscription =
                 Observable.Interval(Constants.Speed).ObserveOn(Scheduler.Default)
                           .Subscribe(async _ => await PlayingArea.MoveFigureAsync(new Point(0, 1)));
             Subscriptions.Add(intervalSubscription);
         }
-        
+
         private async void OnNextFigureLifecycle(FigureLifecycle figureLifecycle)
         {
             switch (figureLifecycle.FigureLifecycleTypes)
             {
                 case FigureLifecycleTypes.Init:
                 case FigureLifecycleTypes.Dead:
-                {
-                    Figure figure = await FigureCreator.CreateFigureAsync(Constants.GameAreaWidth);
-                    await PlayingArea.SetCurrentFigureAsync(figure);
-                    GameStateSubject.OnNext(await BuildGameState());
-                    break;
-                }
+                    {
+                        Figure figure = await FigureCreator.CreateFigureAsync(Constants.GameAreaWidth);
+                        await PlayingArea.SetCurrentFigureAsync(figure);
+                        GameStateSubject.OnNext(await BuildGameState());
+                        break;
+                    }
+                case FigureLifecycleTypes.Rotated:
                 case FigureLifecycleTypes.Moved:
-                {
-                    GameStateSubject.OnNext(await BuildGameState());
-                    break;
-                }
+                    {
+                        GameStateSubject.OnNext(await BuildGameState());
+                        break;
+                    }
             }
         }
 

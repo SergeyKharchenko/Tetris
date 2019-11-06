@@ -11,6 +11,7 @@
         None = 0,
         Init = 1,
         Moved = 2,
-        Dead = 3
+        Dead = 3,
+        Rotated = 4
     }
 }

@@ -9,9 +9,9 @@ namespace Tetris.GUI
 
         public static readonly TimeSpan Speed = TimeSpan.FromSeconds(0.15);
 
-        public static readonly int GameAreaWidth = 20;
+        public static readonly int GameAreaWidth = 10;
 
-        public static readonly int GameAreaHeight = 10;
+        public static readonly int GameAreaHeight = 20;
 
         public static readonly int FigureMaxWidth = 5;
     }
