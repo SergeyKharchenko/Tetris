@@ -3,23 +3,47 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
 
-namespace Tetris.GUI
+namespace Tetris.GUI.Tetromino
 {
     public class TetrominoGenerator
     {
-        private int _size;
+        private int _size = 5;
 
-        public bool[,] CreateTetromino(int size, int blocksAmount)
+        public bool[,] CreateTetromino(int blocksAmount)
         {
-            _size = size;
-
-            var tetromino = new bool[size, size];
-            Point startPoint = GetStartPoint(size);
+            var tetromino = new bool[_size, _size];
+            Point startPoint = GetStartPoint(_size);
             tetromino[startPoint.X, startPoint.Y] = true;
 
             GenerateTetromino(tetromino, blocksAmount);
+            tetromino = GetFilledArea(tetromino);
 
             return tetromino;
+        }
+
+        private bool[,] GetFilledArea(bool[,] tetromino)
+        {
+            var projector = new TetraminoProjector();
+            (int left, int top, int right, int bottom) bounds = projector.GetBounds(tetromino);
+
+            int height = Math.Max(1, (bounds.bottom - bounds.top) + 1);
+            int width = Math.Max(1, bounds.right - bounds.left + 1);
+            var newTetramino = new bool[width, height];
+
+            for (int i = 0; i < _size; i++)
+            {
+                for (int j = 0; j < _size; j++)
+                {
+                    if (i >= bounds.left && i <= bounds.right && j >= bounds.top && j <= bounds.bottom)
+                    {
+                        int x = i - bounds.left;
+                        int y = j - bounds.top;
+                        newTetramino[x, y] = tetromino[i, j];
+                    }
+                }
+            }
+
+            return newTetramino;
         }
 
         private Point GetStartPoint(int size)

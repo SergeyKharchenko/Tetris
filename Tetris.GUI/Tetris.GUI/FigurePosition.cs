@@ -8,19 +8,22 @@ namespace Tetris.GUI
     public class FigurePosition
     {
         private readonly bool[,] Position;
-        private int Size => Position.GetUpperBound(0) + 1;
+        private int Height => Position.GetUpperBound(0) + 1;
+        private int Width => Position.GetUpperBound(1) + 1;
 
         public FigurePosition(bool[,] position)
         {
-            Position = (bool[,]) position.Clone();
+            Position = (bool[,])position.Clone();
         }
 
         public Point[] GetOffset(Point location)
         {
             var offset = new List<Point>();
-            int size = Size;
-            for (var x = 0; x < size; ++x) {
-                for (var y = 0; y < size; ++y) {
+
+            for (var x = 0; x < Height; ++x)
+            {
+                for (var y = 0; y < Width; ++y)
+                {
                     bool value = Position[x, y];
                     if (value)
                     {
@@ -35,24 +38,25 @@ namespace Tetris.GUI
         {
             return await Task.Run(() =>
             {
-                int size = Size;
-                var position = new bool[size, size];
-                for (var x = 0; x < size; ++x) {
-                    for (var y = 0; y < size; ++y) {
-                        position[x, y] = Position[size - y - 1, x];
+                var position = new bool[Width, Height];
+                for (var x = 0; x < Width; ++x)
+                {
+                    for (var y = 0; y < Height; ++y)
+                    {
+                        position[x, y] = Position[Height - y - 1, x];
                     }
                 }
-                return new FigurePosition( position);
+                return new FigurePosition(position);
             });
         }
 
         public override string ToString()
         {
             var str = "";
-            int size = Size;
-            for (var x = 0; x < size; x++)
+
+            for (var x = 0; x < Height; x++)
             {
-                for (var y = 0; y < size; y++)
+                for (var y = 0; y < Width; y++)
                 {
                     bool value = Position[x, y];
                     str += value ? "1" : "0";

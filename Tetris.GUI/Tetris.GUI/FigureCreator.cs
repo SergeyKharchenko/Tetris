@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Drawing;
 using System.Threading.Tasks;
+using Tetris.GUI.Tetromino;
 
 namespace Tetris.GUI
 {
@@ -32,7 +33,7 @@ namespace Tetris.GUI
             int figureSize = Random.Next(1, Constants.FigureMaxWidth + 1);
             var blocksAmount = Random.Next(1, Math.Min(figureSize * 2, figureSize * figureSize));
 
-            bool[,] shape = Generator.CreateTetromino(Math.Min(figureSize, blocksAmount), blocksAmount);
+            bool[,] shape = Generator.CreateTetromino(blocksAmount);
 
             var location = new Point(width / 2 - figureSize / 2, 0);
             Color color = Colors[Random.Next(0, Colors.Length)];
