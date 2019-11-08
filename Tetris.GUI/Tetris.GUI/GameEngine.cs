@@ -1,18 +1,23 @@
-﻿using System;
+﻿using Nito.AsyncEx;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Reactive.Concurrency;
+using System.Reactive.Disposables;
 using System.Reactive.Linq;
 using System.Reactive.Subjects;
 using System.Threading.Tasks;
+using System.Threading.Tasks.Dataflow;
 
 namespace Tetris.GUI {
     public class GameEngine : IDisposable {
-        private readonly IFigureCreator FigureCreator = new FigureCreator();
-        private readonly GameArea PlayingArea = new GameArea(new MovingValidator());
-        private readonly List<IDisposable> Subscriptions = new List<IDisposable>();
+        private readonly IFigureCreator _figureCreator = new FigureCreator();
+        private readonly GameArea _playingArea = new GameArea(new MovingValidator());
+        private readonly CompositeDisposable _subscriptions = new CompositeDisposable();
         private readonly IObservable<Point> _navigationObservable;
         private readonly IObservable<bool> _rotationObservable;
+        private TransformBlock<ChangeInfo, FigureLifecycleTypes> _changeBlock;
+        private readonly AsyncManualResetEvent _figureCreatedSignal = new AsyncManualResetEvent();
 
         public IObservable<GameState> GameState => GameStateSubject?.AsObservable();
         private BehaviorSubject<GameState> GameStateSubject;
@@ -23,59 +28,96 @@ namespace Tetris.GUI {
         }
 
         public void Dispose() {
-            Unsubscribe();
+            Stop();
+            _subscriptions.Dispose();
         }
 
-        private void Unsubscribe() {
-            Subscriptions.ForEach(subscription => subscription.Dispose());
-            Subscriptions.Clear();
+        private void Stop() {
+            _subscriptions.Clear();
+            _changeBlock?.Complete();
         }
 
         public async Task StartAsync() {
-            Unsubscribe();
+            Stop();
+            _changeBlock = BuildDataflow();
 
-            await PlayingArea.RestartAsync(Constants.GameAreaWidth, Constants.GameAreaHeight);
-            GameStateSubject = new BehaviorSubject<GameState>(await BuildGameState());
-            IDisposable figureLifecycleSubscribe =
-                PlayingArea.FigureLifecycle.ObserveOn(Scheduler.Default).Subscribe(OnNextFigureLifecycle);
-            Subscriptions.Add(figureLifecycleSubscribe);
+            await _playingArea.RestartAsync(Constants.GameAreaWidth, Constants.GameAreaHeight);
+
+            GameStateSubject = new BehaviorSubject<GameState>(await BuildGameStateAsync());
 
             IDisposable navigationSubscription =
                 _navigationObservable.ObserveOn(Scheduler.Default)
-                                           .Subscribe(async offset => { await PlayingArea.MoveFigureAsync(offset); });
-            Subscriptions.Add(navigationSubscription);
+                                           .Subscribe(offset => _changeBlock.Post(ChangeInfo.Move(offset)));
+            _subscriptions.Add(navigationSubscription);
 
             IDisposable rotationSubscription =
                 _rotationObservable.ObserveOn(Scheduler.Default)
-                                           .Subscribe(async offset => { await PlayingArea.RotateFigureAsync(); });
-            Subscriptions.Add(rotationSubscription);
+                                           .Subscribe(_ => _changeBlock.Post(ChangeInfo.Rotate()));
+            _subscriptions.Add(rotationSubscription);
 
             IDisposable intervalSubscription =
                 Observable.Interval(Constants.Speed).ObserveOn(Scheduler.Default)
-                          .Subscribe(async _ => await PlayingArea.MoveFigureAsync(new Point(0, 1)));
-            Subscriptions.Add(intervalSubscription);
+                          .Subscribe(_ => _changeBlock.Post(ChangeInfo.Move(new Point(0, 1))));
+            _subscriptions.Add(intervalSubscription);
+
+            await CreateNewFigureAsync();
         }
 
-        private async void OnNextFigureLifecycle(FigureLifecycle figureLifecycle) {
-            switch (figureLifecycle.FigureLifecycleTypes) {
-                case FigureLifecycleTypes.Init:
-                case FigureLifecycleTypes.Dead: {
-                    Figure figure = await FigureCreator.CreateFigureAsync(Constants.GameAreaWidth);
-                    await PlayingArea.SetCurrentFigureAsync(figure);
-                    GameStateSubject.OnNext(await BuildGameState());
-                    break;
-                }   
-                case FigureLifecycleTypes.Rotated:
-                case FigureLifecycleTypes.Moved: {
-                    GameStateSubject.OnNext(await BuildGameState());
-                    break;
+        private TransformBlock<ChangeInfo, FigureLifecycleTypes> BuildDataflow() {
+            var changeBlock = new TransformBlock<ChangeInfo, FigureLifecycleTypes>(async info => {
+                await _figureCreatedSignal.WaitAsync();
+                if (info.IsRotate) {
+                    return await _playingArea.RotateFigureAsync();
                 }
-            }
+                return await _playingArea.MoveFigureAsync(info.Offset);
+            });
+            var deadBlock = new TransformBlock<FigureLifecycleTypes, FigureLifecycleTypes>(async figureLifecycleType => {
+                _figureCreatedSignal.Reset();
+                await CreateNewFigureAsync();
+                return figureLifecycleType;
+            });
+            var collectStateBlock = new TransformBlock<FigureLifecycleTypes, GameState>(async _ => await BuildGameStateAsync());
+            var sendStateBlock = new ActionBlock<GameState>(state => {
+                GameStateSubject.OnNext(state);
+            });
+
+            changeBlock.LinkTo(deadBlock, new DataflowLinkOptions {
+                PropagateCompletion = true
+            }, figureLifecycleType => figureLifecycleType == FigureLifecycleTypes.Dead);
+            changeBlock.LinkTo(collectStateBlock, new DataflowLinkOptions {
+                PropagateCompletion = true
+            }, figureLifecycleType => figureLifecycleType != FigureLifecycleTypes.None);
+            changeBlock.LinkTo(DataflowBlock.NullTarget<FigureLifecycleTypes>());
+
+            deadBlock.LinkTo(collectStateBlock);
+
+            collectStateBlock.LinkTo(sendStateBlock, new DataflowLinkOptions { PropagateCompletion = true });
+            return changeBlock;
         }
 
-        private async Task<GameState> BuildGameState() {
+        private async Task CreateNewFigureAsync() {
+            Figure figure = await _figureCreator.CreateFigureAsync(Constants.GameAreaWidth);
+            await _playingArea.SetCurrentFigureAsync(figure);
+            _figureCreatedSignal.Set();
+        }
+
+        private async Task<GameState> BuildGameStateAsync() {
             return new GameState {
-                Area = await PlayingArea.GetGameCellsAsync()
+                Area = await _playingArea.GetGameCellsAsync()
+            };
+        }
+
+        private class ChangeInfo {
+            public bool IsRotate { get; set; }
+
+            public Point Offset { get; set; }
+
+            public static ChangeInfo Move(Point offset) => new ChangeInfo {
+                Offset = offset
+            };
+
+            public static ChangeInfo Rotate() => new ChangeInfo {
+                IsRotate = true
             };
         }
     }

@@ -8,8 +8,6 @@ using System.Threading.Tasks;
 
 namespace Tetris.GUI {
     public class GameArea {
-        private readonly SemaphoreSlim Mutex = new SemaphoreSlim(1);
-
         private GameGrid Grid;
         private readonly IMovingValidator MovingValidator;
 
@@ -18,37 +16,23 @@ namespace Tetris.GUI {
 
         private Figure CurrentFigure;
 
-        public IObservable<FigureLifecycle> FigureLifecycle => FigureLifecycleSubject?.AsObservable();
-        private BehaviorSubject<FigureLifecycle> FigureLifecycleSubject;
-
         public GameArea(IMovingValidator movingValidator) {
             MovingValidator = movingValidator;
         }
 
         public async Task RestartAsync(int width, int height) {
-            await Mutex.WaitAsync();
-
-            try {
-                Grid = new GameGrid(width, height);
-                FigureLifecycleSubject = new BehaviorSubject<FigureLifecycle>(new FigureLifecycle {
-                    FigureLifecycleTypes = FigureLifecycleTypes.Init
-                });
-            } finally {
-                Mutex.Release();
-            }
+            await Task.Yield();
+            Grid = new GameGrid(width, height);
         }
 
         public async Task SetCurrentFigureAsync(Figure figure) {
-            await Mutex.WaitAsync();
-            try {
-                CurrentFigure = figure;
-                await PositionCurrentFigureOnAreaAsync();
-            } finally {
-                Mutex.Release();
-            }
+            CurrentFigure = figure;
+            await PositionCurrentFigureOnAreaAsync();
         }
 
-        private Task PositionCurrentFigureOnAreaAsync() {
+        private async Task PositionCurrentFigureOnAreaAsync() {
+            await Task.Yield();
+
             foreach (GameCell cell in Grid.Cast<GameCell>().Where(cell => cell.IsFigure)) {
                 cell.IsFigure = false;
             }
@@ -58,51 +42,42 @@ namespace Tetris.GUI {
                 Grid[point].IsFigure = true;
                 Grid[point].Color = CurrentFigure.Color;
             }
-
-            return Task.CompletedTask;
         }
 
-        public async Task MoveFigureAsync(Point offset) {
+        public async Task<FigureLifecycleTypes> MoveFigureAsync(Point offset) {
+            await Task.Yield();
+
             if (CurrentFigure == null) {
-                return;
+                return FigureLifecycleTypes.None;
             }
 
             var lifecycleType = FigureLifecycleTypes.None;
+            MovingValidationResult result = await MovingValidator.ValidateAsync(Grid, CurrentFigure, offset);
+            if (result.Allow) {
+                await CurrentFigure.MoveAsync(offset);
+                await PositionCurrentFigureOnAreaAsync();
+                lifecycleType = FigureLifecycleTypes.Moved;
+            } else if (result.Dead) {
+                await KillCurrentFigureAsync();
+                await CheckLinesOnExplosionAsync();
+                lifecycleType = FigureLifecycleTypes.Dead;
 
-            await Mutex.WaitAsync();
-            try {
-                MovingValidationResult result = await MovingValidator.ValidateAsync(Grid, CurrentFigure, offset);
-                if (result.Allow) {
-                    await CurrentFigure.MoveAsync(offset);
-                    await PositionCurrentFigureOnAreaAsync();
-                    lifecycleType = FigureLifecycleTypes.Moved;
-                } else if (result.Dead) {
-                    await KillCurrentFigureAsync();
-                    await CheckLinesOnExplosionAsync();
-                    lifecycleType = FigureLifecycleTypes.Dead;
-
-                }
-            } finally {
-                Mutex.Release();
             }
-            FigureLifecycleSubject.OnNext(new FigureLifecycle {
-                FigureLifecycleTypes = lifecycleType
-            });
+            return lifecycleType;
         }
 
         private async Task CheckLinesOnExplosionAsync() {
+            await Task.Yield();
             for (int y = 0; y < Grid.Height; y++) {
                 GameCell[] line = Grid[y];
                 if (line.All(cell => cell.IsOccupied)) {
-                    //foreach (var cell in line) {
-                    //    cell.IsOccupied = false;
-                    //}
                     await MoveAllUpperCellsDownAsync(y);
                 }
             }
         }
 
-        private Task MoveAllUpperCellsDownAsync(int y) {
+        private async Task MoveAllUpperCellsDownAsync(int y) {
+            await Task.Yield();
             for (int yu = y - 1; yu >= 0; yu--) {
                 GameCell[] line = Grid[yu];
                 GameCell[] bottomLine = Grid[yu + 1];
@@ -112,41 +87,30 @@ namespace Tetris.GUI {
                     line[x].Clear();
                 }
             }
-            return Task.CompletedTask;
         }
 
-        public async Task RotateFigureAsync() {
+        public async Task<FigureLifecycleTypes> RotateFigureAsync() {
+            await Task.Yield();
             if (CurrentFigure == null) {
-                return;
+                return FigureLifecycleTypes.None;
             }
-
-            var lifecycleType = FigureLifecycleTypes.None;
-
-            await Mutex.WaitAsync();
-            try {
-                await CurrentFigure.RotateAsync();
-                await PositionCurrentFigureOnAreaAsync();
-                lifecycleType = FigureLifecycleTypes.Rotated;
-            } finally {
-                Mutex.Release();
-            }
-            FigureLifecycleSubject.OnNext(new FigureLifecycle {
-                FigureLifecycleTypes = lifecycleType
-            });
+            await CurrentFigure.RotateAsync();
+            await PositionCurrentFigureOnAreaAsync();
+            return FigureLifecycleTypes.Rotated;
         }
 
-        private Task KillCurrentFigureAsync() {
+        private async Task KillCurrentFigureAsync() {
+            await Task.Yield();
             foreach (GameCell cell in Grid.Cast<GameCell>().Where(cell => cell.IsOccupied)) {
                 cell.IsOccupied = true;
                 cell.IsFigure = false;
             }
-
             CurrentFigure = null;
-            return Task.CompletedTask;
         }
 
         public async Task<GameGrid> GetGameCellsAsync() {
-            return await Task.FromResult((GameGrid)Grid.Clone());
+            await Task.Yield();
+            return (GameGrid)Grid.Clone();
         }
     }
 }
