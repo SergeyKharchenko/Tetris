@@ -37,7 +37,7 @@ namespace Tetris.GUI {
                 cell.IsFigure = false;
             }
 
-            Point[] offset = CurrentFigure.GetPositionWithOffset();
+            Point[] offset = await CurrentFigure.GetPositionWithOffsetAsync();
             foreach (Point point in offset) {
                 Grid[point].IsFigure = true;
                 Grid[point].Color = CurrentFigure.Color;
@@ -52,7 +52,7 @@ namespace Tetris.GUI {
             }
 
             var lifecycleType = FigureLifecycleTypes.None;
-            MovingValidationResult result = await MovingValidator.ValidateAsync(Grid, CurrentFigure, offset);
+            MovingValidationResult result = await MovingValidator.ValidateMoveAsync(Grid, CurrentFigure, offset);
             if (result.Allow) {
                 await CurrentFigure.MoveAsync(offset);
                 await PositionCurrentFigureOnAreaAsync();
@@ -94,7 +94,14 @@ namespace Tetris.GUI {
             if (CurrentFigure == null) {
                 return FigureLifecycleTypes.None;
             }
+
+            var originalFigure = (Figure)CurrentFigure.Clone();
+
             await CurrentFigure.RotateAsync();
+            if (!await MovingValidator.ValidateRotationAsync(Grid, CurrentFigure)) {
+                await SetCurrentFigureAsync(originalFigure);
+                return FigureLifecycleTypes.None;
+            }
             await PositionCurrentFigureOnAreaAsync();
             return FigureLifecycleTypes.Rotated;
         }

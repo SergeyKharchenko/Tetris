@@ -4,6 +4,8 @@ using System.Threading.Tasks;
 namespace Tetris.GUI {
     public interface IMovingValidator
     {
-        Task<MovingValidationResult> ValidateAsync(GameGrid area, Figure figure, Point offset);
+        Task<MovingValidationResult> ValidateMoveAsync(GameGrid area, Figure figure, Point offset);
+
+        Task<bool> ValidateRotationAsync(GameGrid area, Figure figure);
     }
 }

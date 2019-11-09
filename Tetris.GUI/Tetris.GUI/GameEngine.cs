@@ -17,6 +17,7 @@ namespace Tetris.GUI {
         private readonly IObservable<Point> _navigationObservable;
         private readonly IObservable<bool> _rotationObservable;
         private TransformBlock<ChangeInfo, FigureLifecycleTypes> _changeBlock;
+        private TransformBlock<FigureLifecycleTypes, FigureLifecycleTypes> _deadBlock;
         private readonly AsyncManualResetEvent _figureCreatedSignal = new AsyncManualResetEvent();
 
         public IObservable<GameState> GameState => GameStateSubject?.AsObservable();
@@ -39,7 +40,7 @@ namespace Tetris.GUI {
 
         public async Task StartAsync() {
             Stop();
-            _changeBlock = BuildDataflow();
+            BuildDataflow();
 
             await _playingArea.RestartAsync(Constants.GameAreaWidth, Constants.GameAreaHeight);
 
@@ -60,20 +61,22 @@ namespace Tetris.GUI {
                           .Subscribe(_ => _changeBlock.Post(ChangeInfo.Move(new Point(0, 1))));
             _subscriptions.Add(intervalSubscription);
 
-            await CreateNewFigureAsync();
+            _deadBlock.Post(FigureLifecycleTypes.Dead);
         }
 
-        private TransformBlock<ChangeInfo, FigureLifecycleTypes> BuildDataflow() {
-            var changeBlock = new TransformBlock<ChangeInfo, FigureLifecycleTypes>(async info => {
+        private void BuildDataflow() {
+            _changeBlock = new TransformBlock<ChangeInfo, FigureLifecycleTypes>(async info => {
                 await _figureCreatedSignal.WaitAsync();
                 if (info.IsRotate) {
                     return await _playingArea.RotateFigureAsync();
                 }
                 return await _playingArea.MoveFigureAsync(info.Offset);
             });
-            var deadBlock = new TransformBlock<FigureLifecycleTypes, FigureLifecycleTypes>(async figureLifecycleType => {
+            _deadBlock = new TransformBlock<FigureLifecycleTypes, FigureLifecycleTypes>(async figureLifecycleType => {
                 _figureCreatedSignal.Reset();
-                await CreateNewFigureAsync();
+                Figure figure = await _figureCreator.CreateFigureAsync(Constants.GameAreaWidth);
+                await _playingArea.SetCurrentFigureAsync(figure);
+                _figureCreatedSignal.Set();
                 return figureLifecycleType;
             });
             var collectStateBlock = new TransformBlock<FigureLifecycleTypes, GameState>(async _ => await BuildGameStateAsync());
@@ -81,24 +84,17 @@ namespace Tetris.GUI {
                 GameStateSubject.OnNext(state);
             });
 
-            changeBlock.LinkTo(deadBlock, new DataflowLinkOptions {
+            _changeBlock.LinkTo(_deadBlock, new DataflowLinkOptions {
                 PropagateCompletion = true
             }, figureLifecycleType => figureLifecycleType == FigureLifecycleTypes.Dead);
-            changeBlock.LinkTo(collectStateBlock, new DataflowLinkOptions {
+            _changeBlock.LinkTo(collectStateBlock, new DataflowLinkOptions {
                 PropagateCompletion = true
             }, figureLifecycleType => figureLifecycleType != FigureLifecycleTypes.None);
-            changeBlock.LinkTo(DataflowBlock.NullTarget<FigureLifecycleTypes>());
+            _changeBlock.LinkTo(DataflowBlock.NullTarget<FigureLifecycleTypes>());
 
-            deadBlock.LinkTo(collectStateBlock);
+            _deadBlock.LinkTo(collectStateBlock);
 
             collectStateBlock.LinkTo(sendStateBlock, new DataflowLinkOptions { PropagateCompletion = true });
-            return changeBlock;
-        }
-
-        private async Task CreateNewFigureAsync() {
-            Figure figure = await _figureCreator.CreateFigureAsync(Constants.GameAreaWidth);
-            await _playingArea.SetCurrentFigureAsync(figure);
-            _figureCreatedSignal.Set();
         }
 
         private async Task<GameState> BuildGameStateAsync() {
